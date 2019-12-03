@@ -1,13 +1,17 @@
 package com.virtualpairprogrammers;
 
+import com.google.common.collect.Iterables;
+import org.apache.commons.collections.bag.SynchronizedSortedBag;
 import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
 import org.apache.spark.SparkConf;
+import org.apache.spark.api.java.JavaPairRDD;
 import org.apache.spark.api.java.JavaRDD;
 import org.apache.spark.api.java.JavaSparkContext;
 import scala.Tuple2;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 
 public class Main {
@@ -17,9 +21,17 @@ public class Main {
         // Be careful to use a org.apache.log4j.Logger and no other!
         Logger.getLogger("org.apache").setLevel(Level.WARN);
 
-//        upToLecture11();
-        upToLectureNext();
-
+        // upToLecture11();
+        // lecture13Tuples();
+        // lecture15PairRDD();
+        // lecture16ReduceByKey();
+        // lecture17FluentAPI();
+        // lecture18GroupByKey();
+        // lecture19FlatMaps();
+        // lecture20Filters();
+        // lecture21ReadingFromDisk();
+        lecture22KeywordRankingPracticalMyTry();
+        lecture22KeywordRankingPracticalWorkedSolution();
     }
 
     private static void upToLecture11() {
@@ -75,7 +87,7 @@ public class Main {
         }
     }
 
-    private static void upToLectureNext() {
+    private static void lecture13Tuples() {
 
         List<Integer> inputData = new ArrayList<>();
         inputData.add(10);
@@ -95,5 +107,224 @@ public class Main {
 
         }
 
+    }
+
+    private static List<String> getLogSample() {
+        List<String> inputData = new ArrayList<>();
+        inputData.add("WARN: Tuesday 4 September 0405");
+        inputData.add("ERROR: Tuesday 4 September 0408");
+        inputData.add("FATAL: Wednesday 5 September 1632");
+        inputData.add("ERROR: Friday 7 September 1854");
+        inputData.add("WARN: Saturday 8 September 1942");
+        return inputData;
+    }
+
+    private static void lecture15PairRDD() {
+
+        List<String> inputData = getLogSample();
+
+        SparkConf conf = new SparkConf().setAppName("startingSpark").setMaster("local[*]");
+
+        try (JavaSparkContext sc = new JavaSparkContext(conf)) {
+
+            JavaRDD<String> originalLogMessages = sc.parallelize(inputData);
+            JavaPairRDD<String, String> pairRDD = originalLogMessages.mapToPair(rawValue -> {
+                String[] columns = rawValue.split(":");
+                String level = columns[0];
+                String date = columns[1];
+
+                return new Tuple2<>(level, date);
+            });
+
+            pairRDD.foreach(tuple -> System.out.println(tuple._1 + " happened the " + tuple._2));
+        }
+    }
+
+    private static void lecture16ReduceByKey() {
+
+        List<String> inputData = getLogSample();
+
+        SparkConf conf = new SparkConf().setAppName("startingSpark").setMaster("local[*]");
+
+        try (JavaSparkContext sc = new JavaSparkContext(conf)) {
+
+            System.out.println("Counting types of log level with");
+
+            JavaRDD<String> originalLogMessages = sc.parallelize(inputData);
+            JavaPairRDD<String, Long> pairRDD = originalLogMessages.mapToPair(rawValue -> {
+                String[] columns = rawValue.split(":");
+                String level = columns[0];
+
+                return new Tuple2<>(level, 1L);
+            });
+
+            JavaPairRDD<String, Long> sumsRDD = pairRDD.reduceByKey((value1, value2) -> value1 + value2);
+            sumsRDD.foreach(tuple -> System.out.println(tuple._1 + " has " + tuple._2 + " instances"));
+        }
+    }
+
+    private static void lecture17FluentAPI() {
+
+        System.out.println("---- lecture17FluentAPI");
+
+        List<String> inputData = getLogSample();
+
+        SparkConf conf = new SparkConf().setAppName("startingSpark").setMaster("local[*]");
+
+        try (JavaSparkContext sc = new JavaSparkContext(conf)) {
+
+            System.out.println("Counting types of log level with a FLUENT API");
+
+            sc.parallelize(inputData)
+                    .mapToPair(rawValue -> new Tuple2<>(rawValue.split(":")[0], 1L))
+                    .reduceByKey((value1, value2) -> value1 + value2)
+                    .foreach(tuple -> System.out.println(tuple._1 + " has " + tuple._2 + " instances"));
+        }
+    }
+
+    private static void lecture18GroupByKey() {
+
+        System.out.println("---- lecture18GroupByKey");
+
+        List<String> inputData = getLogSample();
+
+        SparkConf conf = new SparkConf().setAppName("startingSpark").setMaster("local[*]");
+
+        try (JavaSparkContext sc = new JavaSparkContext(conf)) {
+
+            System.out.println("Use of a groupByKey, which is NOT AT ALL RECOMMENDED for performances reasons");
+
+            sc.parallelize(inputData)
+                    .mapToPair(rawValue -> new Tuple2<>(rawValue.split(":")[0], 1L))
+                    .groupByKey()
+                    .foreach(tuple -> System.out.println(tuple._1 + " has " + Iterables.size(tuple._2) + " instances"));
+        }
+    }
+
+    private static void lecture19FlatMaps() {
+
+        System.out.println("---- lecture19FlatMaps");
+
+        List<String> inputData = getLogSample();
+
+        SparkConf conf = new SparkConf().setAppName("startingSpark").setMaster("local[*]");
+
+        try (JavaSparkContext sc = new JavaSparkContext(conf)) {
+
+            JavaRDD<String> sentences = sc.parallelize(inputData);
+            JavaRDD<String> words = sentences.flatMap(value -> Arrays.asList(value.split(" ")).iterator());
+
+            System.out.println("Print sentences");
+            sentences.collect().forEach(System.out::println);
+            System.out.println("Print words");
+            words.collect().forEach(System.out::println);
+        }
+    }
+
+    private static void lecture20Filters() {
+
+        System.out.println("---- lecture20Filters");
+
+        List<String> inputData = getLogSample();
+
+        SparkConf conf = new SparkConf().setAppName("startingSpark").setMaster("local[*]");
+
+        try (JavaSparkContext sc = new JavaSparkContext(conf)) {
+            System.out.println("Only print word which length > 1");
+
+            sc.parallelize(inputData)
+                    .flatMap(value -> Arrays.asList(value.split(" ")).iterator())
+                    .filter(word -> word.length() > 1)
+                    .collect()
+                    .forEach(System.out::println);
+
+        }
+    }
+
+    private static void lecture21ReadingFromDisk() {
+
+        System.out.println("---- lecture21ReadingFromDisk");
+
+        // require to load Hadoop libraries through winutils.exe and avoid "Unable to load native-hadoop library for your platform" issue
+        System.setProperty("hadoop.home.dir", "d:/tools/winutils-extra/hadoop");
+
+        SparkConf conf = new SparkConf().setAppName("startingSpark").setMaster("local[*]");
+
+        try (JavaSparkContext sc = new JavaSparkContext(conf)) {
+
+            JavaRDD<String> initialRDD = sc.textFile("src/main/resources/subtitles/input.txt");
+            initialRDD
+                    .flatMap(value -> Arrays.asList(value.split(" ")).iterator())
+                    .collect()
+                    .forEach(System.out::println);
+        }
+    }
+
+    private static void lecture22KeywordRankingPracticalMyTry() {
+
+        System.out.println("---- lecture22KeywordRankingPracticalMyTry");
+
+        // require to load Hadoop libraries through winutils.exe and avoid "Unable to load native-hadoop library for your platform" issue
+        System.setProperty("hadoop.home.dir", "d:/tools/winutils-extra/hadoop");
+
+        SparkConf conf = new SparkConf().setAppName("startingSpark").setMaster("local[*]");
+
+        try (JavaSparkContext sc = new JavaSparkContext(conf)) {
+
+            JavaRDD<String> boringWords = sc.textFile("src/main/resources/subtitles/boringwords.txt");
+
+            JavaRDD<String> initialRDD = sc.textFile("src/main/resources/subtitles/input.txt");
+            initialRDD
+                    // 1) get words from input.txt
+                    .flatMap(sentence -> Arrays.asList(sentence.split(" ")).iterator())
+                    // 2) filter words that are boring (only keep words that are not boring)
+                    .filter(word -> Util.isNotBoring(word))
+                    // 3) count occurences of every remaining words (using the method of lecture 16 and 17)
+                    .mapToPair(word -> new Tuple2<>(word, 1L))
+                    .reduceByKey((value1, value2) -> value1 + value2)
+                    // 4) now we need to sort the words by their occurrence
+                    // to do so, let's transform <blabla, 3> in <3, blabla> to be able to sort those new tuple by key
+                    .mapToPair(tuple -> new Tuple2<>(tuple._2, tuple._1))
+                    .sortByKey(false)
+                    // 5) finally we take the 10 bigger
+                    .take(10)
+                    .forEach(System.out::println);
+        }
+    }
+
+    private static void lecture22KeywordRankingPracticalWorkedSolution() {
+
+        System.out.println("---- lecture22KeywordRankingPracticalWorkedSolution");
+
+        // require to load Hadoop libraries through winutils.exe and avoid "Unable to load native-hadoop library for your platform" issue
+        System.setProperty("hadoop.home.dir", "d:/tools/winutils-extra/hadoop");
+
+        SparkConf conf = new SparkConf().setAppName("startingSpark").setMaster("local[*]");
+
+        try (JavaSparkContext sc = new JavaSparkContext(conf)) {
+
+            JavaRDD<String> initialRdd = sc.textFile("src/main/resources/subtitles/input.txt");
+
+            JavaRDD<String> lettersOnlyRdd = initialRdd.map( sentence -> sentence.replaceAll("[^a-zA-Z\\s]", "").toLowerCase() );
+
+            JavaRDD<String> removedBlankLines = lettersOnlyRdd.filter( sentence -> sentence.trim().length() > 0 );
+
+            JavaRDD<String> justWords = removedBlankLines.flatMap(sentence -> Arrays.asList(sentence.split(" ")).iterator());
+
+            JavaRDD<String> blankWordsRemoved = justWords.filter(word -> word.trim().length() > 0);
+
+            JavaRDD<String> justInterestingWords = blankWordsRemoved.filter(word -> Util.isNotBoring(word));
+
+            JavaPairRDD<String, Long> pairRdd = justInterestingWords.mapToPair(word -> new Tuple2<String, Long>(word, 1L));
+
+            JavaPairRDD<String, Long> totals = pairRdd.reduceByKey((value1, value2) -> value1 + value2);
+
+            JavaPairRDD<Long, String> switched = totals.mapToPair(tuple -> new Tuple2<Long, String> (tuple._2, tuple._1 ));
+
+            JavaPairRDD<Long, String> sorted = switched.sortByKey(false);
+
+            List<Tuple2<Long,String>> results = sorted.take(10);
+            results.forEach(System.out::println);
+        }
     }
 }
