@@ -109,3 +109,86 @@ Exercice:
 * get rid of all "boring" words (from _subtitles/boringwords.txt_)
 * count remaining words and find the 10 most used
 
+== 10 - Sorts and Coalesce
+
+=== 10.26 - Why Coalesce is the wrong solution?
+
+WARNING: `foreach` executes the lambda on each partition *in parallel*.
+
+-> It means that several threads will compete to execute the lambda, which is NOT compatible with a correct *sort* result. +
+Example:
+
+* 1st thread prints "1, 2, 3"
+* then 2nd thread prints "1, 2"
+* then 3rd thread prints "1, 2, 3, 4, 5"
+* which gives a final result of "1, 2, 3, 1, 2, 1 ,2 ,3 ,4, 5"
+
+-> NOT SORTED
+
+image::spark-training_01.jpg[]
+
+A solution is to call a prior `take` method (by example) that is aware of the different partitions being processed, and will retrieve the elements in the good order for a next coming display.
+
+----
+JavaPairRDD<Long, String> sorted = switched.sortByKey(false);
+
+int numPartitions = sorted.getNumPartitions();
+System.out.println("Number of partitions at this level: " + numPartitions);
+// This foreach will NOT give a correct sort, as its associated lambda is going to be executed in parallel by multiple threads
+// sorted.foreach(element -> System.out.println(element));
+
+List<Tuple2<Long,String>> results = sorted.take(10);
+results.forEach(System.out::println);
+----
+
+=== 10.27 - What is Coalesce used for in Spark
+
+.coalesce correct usage
+image::spark-training_02.jpg[]
+
+* Coalesce is used for *performance reasons*, never for correctness.
+
+.collect correct usage
+image::spark-training_03.jpg[]
+
+.The truth about shuffling data and knowing about partitions
+image::spark-training_04.jpg[]
+
+== 11 - Deployint to AWS EMR
+
+*EMR* : *Elastic Map Reduce*, which is Amazon implementation of Hadoop in the cloud.
+
+=== 11.30 - Running Spark Job on EMR
+
+*Spark history server* sur le port 18080.
+
+=== 11.31 - Understanding the Job Progress Output
+
+image::spark-training_05.jpg[]
+image::spark-training_06.jpg[]
+
+----
+[Stage 0:=====================>         (X + Y) / Z]
+----
+
+* 1st number (X) : number of tasks that have completed
+* 2nd number (Y) : number of tasks that are actually running
+* 3rd number (Z) : number of tasks that need to be run
+
+.Reminder about what is a task
+NOTE: A task is nothing more than a set of code that is executed against a partition
+
+At the time of recording, the default size of a partition was 64 Mo (should be 128 Mo at 2019/11, chez `spark.files.maxPartitionBytes` configuration parameter). +
+The input file process in this example was \~2.8 Go, so:
+
+* 46 x 64 = 2944 Mo / 1024 = 2,875 Go
+* Here we have 2 executors nodes, each of them has 4 cores, so for the 8 tasks actually running.
+
+
+
+
+
+
+
+
+

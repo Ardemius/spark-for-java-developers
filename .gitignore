@@ -1,0 +1,7 @@
+# MY SPECIFIC IGNORE: just avoid to add heavy binaries from resources folder (can be downloaded apart)
+
+# resources
+resources/
+
+
+

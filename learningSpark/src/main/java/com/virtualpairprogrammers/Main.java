@@ -277,7 +277,11 @@ public class Main {
             initialRDD
                     // 1) get words from input.txt
                     .flatMap(sentence -> Arrays.asList(sentence.split(" ")).iterator())
-                    // 2) filter words that are boring (only keep words that are not boring)
+                    // 2a) get rid of some unwanted characters (keeping only letter), and have all words lowercase
+                    .map(anyWord -> anyWord.replaceAll("[^a-zA-Z\\s]", "").toLowerCase() )
+                    // getting rid of count of blanks coming from previous replacement
+                    .filter(letterWord -> letterWord.length() > 0)
+                    // 2b) filter words that are boring (only keep words that are not boring)
                     .filter(word -> Util.isNotBoring(word))
                     // 3) count occurences of every remaining words (using the method of lecture 16 and 17)
                     .mapToPair(word -> new Tuple2<>(word, 1L))
@@ -323,8 +327,16 @@ public class Main {
 
             JavaPairRDD<Long, String> sorted = switched.sortByKey(false);
 
+            int numPartitions = sorted.getNumPartitions();
+            System.out.println("Number of partitions at this level: " + numPartitions);
+            // This foreach will NOT give a correct sort, as its associated lambda is going to be executed in parallel by multiple threads
+            //sorted.foreach(element -> System.out.println(element));
+
             List<Tuple2<Long,String>> results = sorted.take(10);
+
             results.forEach(System.out::println);
         }
     }
+
+
 }
