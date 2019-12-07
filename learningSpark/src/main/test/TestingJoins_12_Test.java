@@ -1,13 +1,13 @@
-import com.virtualpairprogrammers.TestingJoins;
+import com.virtualpairprogrammers.TestingJoins_12;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
-class TestingJoinsTest {
+class TestingJoins_12_Test {
 
     @Test
     void main() {
         System.out.println("Just a simple test");
-        TestingJoins.main(null);
+        TestingJoins_12.main(null);
 
         Assertions.assertTrue(true);
     }
