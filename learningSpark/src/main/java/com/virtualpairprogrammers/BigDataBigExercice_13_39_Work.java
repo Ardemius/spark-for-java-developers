@@ -4,6 +4,7 @@ import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
 import org.apache.spark.SparkConf;
 import org.apache.spark.api.java.JavaPairRDD;
+import org.apache.spark.api.java.JavaRDD;
 import org.apache.spark.api.java.JavaSparkContext;
 import scala.Tuple2;
 
@@ -21,13 +22,20 @@ import java.util.List;
  * If a user watches > 50% but < 90%, it scores 4
  * If a user watches > 25%, but < 50% it scores 2
  * Otherwise, no score
+ *
+ * Which means that, as a final result, we want a dataset like:
+ *
+ * courseId		score
+ * 		1			6
+ * 		2			10
+ * 		3			0
  */
-public class BigDataBigExercice_13_39
+public class BigDataBigExercice_13_39_Work
 {
-	@SuppressWarnings("resource")
 	public static void main(String[] args)
 	{
-		System.setProperty("hadoop.home.dir", "c:/hadoop");
+		// require to load Hadoop libraries through winutils.exe and avoid "Unable to load native-hadoop library for your platform" issue
+		System.setProperty("hadoop.home.dir","d:/tools/winutils-extra/hadoop");
 		Logger.getLogger("org.apache").setLevel(Level.WARN);
 
 		SparkConf conf = new SparkConf().setAppName("startingSpark").setMaster("local[*]");
@@ -45,8 +53,44 @@ public class BigDataBigExercice_13_39
 		// titlesData: (chapterId, title)
 		JavaPairRDD<Integer, String> titlesData = setUpTitlesDataRdd(sc, testMode);
 
-		// TODO - over to you!
-		
+		// MY SOLUTION
+
+		// 1) get the count of chapters for each course (see WarmupExercice)
+		List<Tuple2<Integer, Integer>> countChapterPerCourseList = chapterData
+				.mapToPair(row -> new Tuple2<>(row._2, 1))
+				.reduceByKey((value1, value2) -> value1 + value2)
+				.collect();
+
+		System.out.println("Display count of chapters per course");
+		countChapterPerCourseList.forEach(value -> System.out.println(value));
+
+		// 2) Invert viewData to get chapter / user pairs list
+		JavaPairRDD<Integer, Integer> chapterUserData = viewData.mapToPair(row -> new Tuple2<>(row._2, row._1));
+		System.out.println("Print chapter / user pairs list");
+		chapterUserData.foreach(v -> System.out.println(v));
+
+		// 3) now we can (inner) join chapterUserData and chapterData
+		JavaPairRDD<Integer, Tuple2<Integer, Integer>> chapterUserCourse = chapterUserData.join(chapterData);
+		System.out.println("Print chapter / (user / course) list");
+		chapterUserCourse.foreach(v -> System.out.println(v));
+
+		// we need to make further processes at course level, meaning a new mapping to get course / user / chapter
+		//JavaRDD<Tuple2> courseUserChapter = chapterUserCourse.map(row -> new Tuple2(row._2._2, new Tuple2<>(row._2._1, row._1)));
+		JavaPairRDD<Integer, Tuple2<Integer, Integer>> courseUserChapter = chapterUserCourse.mapToPair(row -> new Tuple2(row._2._2, new Tuple2<Integer, Integer>(row._2._1, row._1)));
+		//JavaPairRDD<Integer, Tuple2<Integer, Integer>> chapterUserCoursePairRDD = (JavaPairRDD<Integer, Tuple2<Integer, Integer>>) JavaPairRDD.fromJavaRDD(chapterUserCourse);
+		System.out.println("Print course / (user / chapter) list");
+		courseUserChapter.foreach(v -> System.out.println(v));
+
+		// 4) get course / (user, count of chapter)
+		JavaPairRDD<Integer, Tuple2<Integer, Integer>> courseUserOne = courseUserChapter.mapToPair(row -> new Tuple2(row._1, new Tuple2(row._2._1, 1)));
+		System.out.println("Print course / (user / ONE) list");
+		courseUserOne.foreach(v -> System.out.println(v));
+
+		// 5) et là je suis coincé... J'ai besoin d'un réduction sur le user (le 2e valeur de mon triplet), et je ne sais pas comment faire...
+		// -> et en fait, jusqu'ici, c'était tout bon !
+		// pour mon problème de réduction, il faut juste transformer la clé elle-même en un tuple,  (course, user) en l'occurence
+		// On va continuer dans la classe BigDataBigExercice_13_39_Solution
+
 		sc.close();
 	}
 

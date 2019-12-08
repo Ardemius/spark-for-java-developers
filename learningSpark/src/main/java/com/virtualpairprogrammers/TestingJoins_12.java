@@ -25,6 +25,7 @@ public class TestingJoins_12 {
         try (JavaSparkContext sc = new JavaSparkContext(conf)) {
 
             // Creation of our example datasets
+            // usersRaw: (userId, username)
             List<Tuple2<Integer, String>> usersRaw = new ArrayList<>();
             usersRaw.add(new Tuple2<>(1, "John"));
             usersRaw.add(new Tuple2<>(2, "Bob"));
@@ -35,6 +36,7 @@ public class TestingJoins_12 {
             System.out.println("Printing usersRaw");
             usersRaw.forEach(System.out::println);
 
+            // visitsRaw: (userId, visits)
             List<Tuple2<Integer, Integer>> visitsRaw = new ArrayList<>();
             visitsRaw.add(new Tuple2<>(4, 18));
             visitsRaw.add(new Tuple2<>(6, 4));
