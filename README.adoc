@@ -178,14 +178,110 @@ image::spark-training_06.jpg[]
 .Reminder about what is a task
 NOTE: A task is nothing more than a set of code that is executed against a partition
 
-At the time of recording, the default size of a partition was 64 Mo (should be 128 Mo at 2019/11, chez `spark.files.maxPartitionBytes` configuration parameter). +
+At the time of recording, the default size of a partition was 64 Mo on S3 (perhaps different at 2019/11, check `spark.files.maxPartitionBytes` configuration parameter ???). +
 The input file process in this example was \~2.8 Go, so:
 
 * 46 x 64 = 2944 Mo / 1024 = 2,875 Go
 * Here we have 2 executors nodes, each of them has 4 cores, so for the 8 tasks actually running.
 
+== 14 - RDD Performance
 
+=== 14.48 - Transformations and actions
 
+Let's take example from lecture 22 "Keyword Ranking Practical":
+
+[source, java]
+----
+SparkConf conf = new SparkConf().setAppName("startingSpark").setMaster("local[*]");
+
+try (JavaSparkContext sc = new JavaSparkContext(conf)) {
+
+    JavaRDD<String> initialRdd = sc.textFile("src/main/resources/subtitles/input.txt");
+
+    JavaRDD<String> lettersOnlyRdd = initialRdd.map( sentence -> sentence.replaceAll("[^a-zA-Z\\s]", "").toLowerCase() );
+
+    JavaRDD<String> removedBlankLines = lettersOnlyRdd.filter( sentence -> sentence.trim().length() > 0 );
+
+    JavaRDD<String> justWords = removedBlankLines.flatMap(sentence -> Arrays.asList(sentence.split(" ")).iterator());
+
+    JavaRDD<String> blankWordsRemoved = justWords.filter(word -> word.trim().length() > 0);
+
+    JavaRDD<String> justInterestingWords = blankWordsRemoved.filter(word -> Util.isNotBoring(word));
+
+    JavaPairRDD<String, Long> pairRdd = justInterestingWords.mapToPair(word -> new Tuple2<String, Long>(word, 1L));
+
+    JavaPairRDD<String, Long> totals = pairRdd.reduceByKey((value1, value2) -> value1 + value2);
+
+    JavaPairRDD<Long, String> switched = totals.mapToPair(tuple -> new Tuple2<Long, String> (tuple._2, tuple._1 ));
+
+    JavaPairRDD<Long, String> sorted = switched.sortByKey(false);
+
+    int numPartitions = sorted.getNumPartitions();
+    System.out.println("Number of partitions at this level: " + numPartitions);
+    // This foreach will NOT give a correct sort, as its associated lambda is going to be executed in parallel by multiple threads
+    //sorted.foreach(element -> System.out.println(element));
+
+	// Here is the Spark "action", all preceding lines were only building an execution plan
+    List<Tuple2<Long,String>> results = sorted.take(10);
+
+    results.forEach(System.out::println);
+}
+----
+
+[IMPORTANT]
+====
+We were told in the introduction that nearly each line was creating a new RDD, which is not true.
+In fact, *until a Spark operation is performed* (meaning when Spark has to do a calculation to provide a result, which is named an *action*), everything that we are doing are only *transformations*, which are "just" building an *execution plan*.
+====
+
+* *Transformations* are lazily executed, only when an action is reached. +
+Check the list in Spark Official doc here: https://spark.apache.org/docs/latest/rdd-programming-guide.html#transformations[RDD programming guide: transformations]
+* *Actions* will result in the execution plan becoming an execution. +
+Check the list in Spark Official doc here: https://spark.apache.org/docs/latest/rdd-programming-guide.html#actions[RDD programming guide: actions]
+
+=== 14.49 - The DAG and Spark UI
+
+IMPORTANT: The *execution plan* is a *DAG* (Directed Acyclic Graph), meaning a graph that doesn't have any loop inside.
+
+.Hack to display the execution plan without installing Spark
+[TIP]
+====
+A hack to print the DAG without having to install Spark: when a Spark program is running, Spark starts a webserver on port 4040 (meaning accessible through http://localhost:4040)
+
+image:spark-training_07.jpg[]
+image:spark-training_08.jpg[]
+====
+
+=== 14.50 - Narrow vs Wide Transformations
+
+* *Narrow transformation*: Spark can implement the transformation without moving any data around (from a partition to another), hence its name "narrow" transformation.
+* Whereas an operation like `rdd.groupByKey()` is a *wide transformation*. +
+It can only be performed by serializing and copying data between partitions (a *shuffle*), implying a great I/O cost.
+
+.Example of `rdd.groupByKey()` wide transformation and its associated shuffles
+image::spark-training_09.jpg[]
+
+=== 14.51 - Shuffles
+
+IMPORTANT: Generally a Spark *stage* is a series of transformations that *don't need a shuffle*.
+
+When Spark needs a shuffle, it creates a new stage, as shown here: +
+image:spark-training_10.jpg[]
+
+-> In the previous DAG example, the shuffle happened after the map.
+
+=== 14.52 - Dealing with key skews
+
+* A *join* is a wide transformation
+
+=== 15.53 - Avoiding groupByKey and using map-side-reduces instead
+
+ReduceByKey can do a reduce on the partitions FIRST. +
+This is a called a *Map Side Reduce*. +
+-> It greatly reduces the amount of data shuffled.
+
+In most cases, a `groupByKey` can be replaced by a `reduceByKey`. +
+Whenever possible, avoid `groupByKey`.
 
 
 
