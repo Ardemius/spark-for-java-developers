@@ -52,6 +52,23 @@ Please note at the time of writing (November 2018), Spark does not support Java 
 This is due to their internal use of a class called sun.misc.Unsafe which has been removed from Java 9.
 ====
 
+."An illegal reflective access operation has occurred" exception
+[NOTE]
+====
+To avoid the _"An illegal reflective access operation has occurred"_ when running Spark program in IntelliJ:
+
+----
+WARNING: An illegal reflective access operation has occurred
+WARNING: Illegal reflective access by org.apache.hadoop.security.authentication.util.KerberosUtil (file:/usr/local/hadoop/share/hadoop/common/lib/hadoop-auth-2.9.0.jar) to method sun.security.krb5.Config.getInstance()
+WARNING: Please consider reporting this to the maintainers of org.apache.hadoop.security.authentication.util.KerberosUtil
+WARNING: Use --illegal-access=warn to enable warnings of further illegal reflective access operations
+WARNING: All illegal access operations will be denied in a future release
+----
+
+Be sure to use Java 8, and not higher. +
+This has to be configured in _"Project Structure"_ menu.
+====
+
 == 6 - PairRDDs
 
 === 6.15 - Building a PairRDD
@@ -256,7 +273,7 @@ image:spark-training_08.jpg[]
 
 * *Narrow transformation*: Spark can implement the transformation without moving any data around (from a partition to another), hence its name "narrow" transformation.
 * Whereas an operation like `rdd.groupByKey()` is a *wide transformation*. +
-It can only be performed by serializing and copying data between partitions (a *shuffle*), implying a great I/O cost.
+It can only be performed by serializing and copying data between partitions (a *shuffle*), implying a *great I/O cost*.
 
 .Example of `rdd.groupByKey()` wide transformation and its associated shuffles
 image::spark-training_09.jpg[]
@@ -281,7 +298,10 @@ This is a called a *Map Side Reduce*. +
 -> It greatly reduces the amount of data shuffled.
 
 In most cases, a `groupByKey` can be replaced by a `reduceByKey`. +
-Whenever possible, avoid `groupByKey`.
+Whenever possible, avoid `groupByKey` which suffers from the following issues:
+
+* it implies a very big shuffle, and so a great I/O cost.
+* as we manipulate very big data sets, *`groupByKey` could result in storing To of data in memory*, which would result in an OOM (Out Of Memory) exception.
 
 
 

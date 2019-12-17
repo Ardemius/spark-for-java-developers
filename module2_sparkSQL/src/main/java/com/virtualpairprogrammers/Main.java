@@ -4,8 +4,17 @@ import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
 import org.apache.spark.api.java.function.FilterFunction;
 import org.apache.spark.sql.*;
+import org.apache.spark.sql.types.DataTypes;
+import org.apache.spark.sql.types.Metadata;
+import org.apache.spark.sql.types.StructField;
+import org.apache.spark.sql.types.StructType;
+import scala.collection.JavaConverters;
+import scala.collection.immutable.Map;
 
-import static org.apache.spark.sql.functions.*;
+import java.util.ArrayList;
+import java.util.List;
+
+import static org.apache.spark.sql.functions.col;
 
 public class Main {
 
@@ -20,19 +29,23 @@ public class Main {
         //lecture58DatasetBasics();
         //lecture59FiltersWithExpression();
         //lecture60FiltersUsingLambdas();
-        lecture61FiltersUsingColumns();
+        //lecture61FiltersUsingColumns();
+        //testDisplayConf();
+        //lecture62FullSQLSyntax();
+        //lecture63InMemoryDataAndSchema();
+        lecture64GroupingAndAggregations();
     }
 
     private static void lecture58DatasetBasics() {
 
         System.out.println("---- lecture58DatasetBasics");
 
-        try (SparkSession spark = SparkSession.builder().appName("testingSql").master("local[*]")
+        try (SparkSession sparkSession = SparkSession.builder().appName("testingSql").master("local[*]")
                 // the next line is only for Windows
                 .config("spark.sql.warehouse.dir", "file:///d:/tmp/")
                 .getOrCreate()) {
 
-            Dataset<Row> dataset = spark.read().option("header", true).csv("src/main/resources/exams/students.csv");
+            Dataset<Row> dataset = sparkSession.read().option("header", true).csv("src/main/resources/exams/students.csv");
             dataset.show();
 
             long numberOfRows = dataset.count();
@@ -54,12 +67,12 @@ public class Main {
 
         System.out.println("---- lecture59FiltersWithExpression");
 
-        try (SparkSession spark = SparkSession.builder().appName("testingSql").master("local[*]")
+        try (SparkSession sparkSession = SparkSession.builder().appName("testingSql").master("local[*]")
                 // the next line is only for Windows
                 .config("spark.sql.warehouse.dir", "file:///d:/tmp/")
                 .getOrCreate()) {
 
-            Dataset<Row> dataset = spark.read().option("header", true).csv("src/main/resources/exams/students.csv");
+            Dataset<Row> dataset = sparkSession.read().option("header", true).csv("src/main/resources/exams/students.csv");
 
             Dataset<Row> modernArtResults = dataset.filter("subject = 'Modern Art' AND year >= 2007");
 
@@ -75,12 +88,12 @@ public class Main {
 
         System.out.println("---- lecture60FiltersUsingLambdas");
 
-        try (SparkSession spark = SparkSession.builder().appName("testingSql").master("local[*]")
+        try (SparkSession sparkSession = SparkSession.builder().appName("testingSql").master("local[*]")
                 // the next line is only for Windows
                 .config("spark.sql.warehouse.dir", "file:///d:/tmp/")
                 .getOrCreate()) {
 
-            Dataset<Row> dataset = spark.read().option("header", true).csv("src/main/resources/exams/students.csv");
+            Dataset<Row> dataset = sparkSession.read().option("header", true).csv("src/main/resources/exams/students.csv");
 
             // Dataset<Row> modernArtResults = dataset.filter("subject = 'Modern Art' AND year >= 2007");
             Dataset<Row> modernArtResults = dataset.filter((FilterFunction<Row>) row -> row.getAs("subject").equals("Modern Art")
@@ -95,12 +108,12 @@ public class Main {
 
         System.out.println("---- lecture61FiltersUsingColumns");
 
-        try (SparkSession spark = SparkSession.builder().appName("testingSql").master("local[*]")
+        try (SparkSession sparkSession = SparkSession.builder().appName("testingSql").master("local[*]")
                 // the next line is only for Windows
                 .config("spark.sql.warehouse.dir", "file:///d:/tmp/")
                 .getOrCreate()) {
 
-            Dataset<Row> dataset = spark.read().option("header", true).csv("src/main/resources/exams/students.csv");
+            Dataset<Row> dataset = sparkSession.read().option("header", true).csv("src/main/resources/exams/students.csv");
 
             Column subjectColumn = dataset.col("subject");
             Column yearColumn = dataset.col("year");
@@ -116,6 +129,101 @@ public class Main {
                     .and(col("year").geq(2007)));
 
             otherModernArtResults.show();
+        }
+    }
+
+    private static void testDisplayConf() {
+
+        System.out.println("---- testDisplayConf");
+
+        try (SparkSession sparkSession = SparkSession.builder().appName("testDisplayConf").master("local[*]")
+                // the next line is only for Windows
+                .config("spark.sql.warehouse.dir", "file:///d:/tmp/")
+                .getOrCreate()) {
+
+            Map<String, String> scalaMap = sparkSession.conf().getAll();
+            //JavaConverters.asJavaIterableConverter(scalaMap).asJava().forEach(v -> System.out.println(v));
+            java.util.Map<String, String> javaMap = JavaConverters.mapAsJavaMapConverter(scalaMap).asJava();
+            javaMap.forEach((v1, v2) -> System.out.println("entry " + v1 + " : " + v2));
+        }
+
+    }
+
+    private static void lecture62FullSQLSyntax() {
+
+        System.out.println("---- lecture62FullSQLSyntax");
+
+        try (SparkSession sparkSession = SparkSession.builder().appName("testingSql").master("local[*]")
+                // the next line is only for Windows
+                .config("spark.sql.warehouse.dir", "file:///d:/tmp/")
+                .getOrCreate()) {
+
+            Dataset<Row> dataframe = sparkSession.read().option("header", true).csv("src/main/resources/exams/students.csv");
+            dataframe.createOrReplaceTempView("my_student_view");
+
+            Dataset<Row> results = sparkSession.sql("select distinct(year) from my_student_view order by year desc");
+
+            results.show();
+        }
+    }
+
+    private static void lecture63InMemoryDataAndSchema() {
+
+        System.out.println("---- lecture63InMemoryDataAndSchema");
+
+        try (SparkSession sparkSession = SparkSession.builder().appName("testingSql").master("local[*]")
+                .config("spark.sql.warehouse.dir", "file:///d:/tmp/")
+                .getOrCreate()) {
+
+            List<Row> inMemoryData = new ArrayList<>();
+            inMemoryData.add(RowFactory.create("WARN", "2016-12-31 04:19:32"));
+            inMemoryData.add(RowFactory.create("FATAL", "2016-12-31 03:22:34"));
+            inMemoryData.add(RowFactory.create("WARN", "2016-12-31 03:21:21"));
+            inMemoryData.add(RowFactory.create("INFO", "2015-4-21 14:32:21"));
+            inMemoryData.add(RowFactory.create("FATAL","2015-4-21 19:23:20"));
+
+            // creation of the schema
+            StructField[] schemaFields = new StructField[]{
+                    new StructField("level", DataTypes.StringType, false, Metadata.empty()),
+                    new StructField("datetime", DataTypes.StringType, false, Metadata.empty())
+            };
+            StructType schema = new StructType(schemaFields);
+
+            Dataset<Row> dataFrame = sparkSession.createDataFrame(inMemoryData, schema);
+
+            dataFrame.show();
+        }
+    }
+
+    private static void lecture64GroupingAndAggregations() {
+
+        System.out.println("---- lecture64GroupingAndAggregations");
+
+        try (SparkSession sparkSession = SparkSession.builder().appName("testingSql").master("local[*]")
+                .config("spark.sql.warehouse.dir", "file:///d:/tmp/")
+                .getOrCreate()) {
+
+            List<Row> inMemoryData = new ArrayList<>();
+            inMemoryData.add(RowFactory.create("WARN", "2016-12-31 04:19:32"));
+            inMemoryData.add(RowFactory.create("FATAL", "2016-12-31 03:22:34"));
+            inMemoryData.add(RowFactory.create("WARN", "2016-12-31 03:21:21"));
+            inMemoryData.add(RowFactory.create("INFO", "2015-4-21 14:32:21"));
+            inMemoryData.add(RowFactory.create("FATAL","2015-4-21 19:23:20"));
+
+            // creation of the schema
+            StructField[] schemaFields = new StructField[]{
+                    new StructField("level", DataTypes.StringType, false, Metadata.empty()),
+                    new StructField("datetime", DataTypes.StringType, false, Metadata.empty())
+            };
+            StructType schema = new StructType(schemaFields);
+
+            Dataset<Row> dataFrame = sparkSession.createDataFrame(inMemoryData, schema);
+            dataFrame.createOrReplaceTempView("logging_table");
+
+            Dataset<Row> resultsCount = sparkSession.sql("select level, count(datetime) from logging_table group by level order by level");
+            resultsCount.show();
+            Dataset<Row> resultsCollectList = sparkSession.sql("select level, collect_list(datetime) from logging_table group by level order by level");
+            resultsCollectList.show();
         }
     }
 

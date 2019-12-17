@@ -373,6 +373,7 @@ public class Main {
 
             List<Tuple2<Long, String>> results = sorted.take(10);
 
+            // Scanner command just to make the program "pause", and be able to access Spark history server on localhost:4040 during that time
             Scanner scanner = new Scanner(System.in);
             scanner.nextLine();
 
@@ -411,6 +412,7 @@ public class Main {
 
             results.foreach(it -> System.out.println("key " + it._1 + " has " + Iterables.size(it._2) + " elements"));
 
+            // Scanner command just to make the program "pause", and be able to access Spark history server on localhost:4040 during that time
             Scanner scanner = new Scanner(System.in);
             scanner.nextLine();
         }
@@ -448,6 +450,7 @@ public class Main {
 
             results.foreach(it -> System.out.println("key " + it._1 + " has " + Iterables.size(it._2) + " elements"));
 
+            // Scanner command just to make the program "pause", and be able to access Spark history server on localhost:4040 during that time
             Scanner scanner = new Scanner(System.in);
             scanner.nextLine();
         }
@@ -482,7 +485,7 @@ public class Main {
             JavaPairRDD<String, Iterable<String>> results = warningsAgainstDate.groupByKey();
 
             // First solution to avoid the redoing of all transformations described below: write data to cache
-            // It creates a king of "checkpoint", storing previous "results" physically in memory
+            // It creates a kind of "checkpoint", storing previous "results" physically in memory
             // The data cached will then be used for the upcoming foreach and count
             // results = results.cache();
 
@@ -500,6 +503,7 @@ public class Main {
             // for every ACTIONS
             System.out.println(results.count());
 
+            // Scanner command just to make the program "pause", and be able to access Spark history server on localhost:4040 during that time
             Scanner scanner = new Scanner(System.in);
             scanner.nextLine();
         }
