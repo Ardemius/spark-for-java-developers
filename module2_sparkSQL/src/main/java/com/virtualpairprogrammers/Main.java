@@ -14,6 +14,7 @@ import scala.collection.immutable.Map;
 import java.util.ArrayList;
 import java.util.List;
 
+import static org.apache.spark.sql.functions.*;
 import static org.apache.spark.sql.functions.col;
 
 public class Main {
@@ -33,7 +34,13 @@ public class Main {
         //testDisplayConf();
         //lecture62FullSQLSyntax();
         //lecture63InMemoryDataAndSchema();
-        lecture64GroupingAndAggregations();
+        //lecture64GroupingAndAggregations();
+        //lecture65DateFormatting();
+        //lecture66MultipleGrouping();
+        //lecture66MultipleGroupingBigLog();
+//        lecture67Ordering();
+//        lecture68DataFrameAPI();
+        lecture69DataFrameGrouping();
     }
 
     private static void lecture58DatasetBasics() {
@@ -180,7 +187,7 @@ public class Main {
             inMemoryData.add(RowFactory.create("FATAL", "2016-12-31 03:22:34"));
             inMemoryData.add(RowFactory.create("WARN", "2016-12-31 03:21:21"));
             inMemoryData.add(RowFactory.create("INFO", "2015-4-21 14:32:21"));
-            inMemoryData.add(RowFactory.create("FATAL","2015-4-21 19:23:20"));
+            inMemoryData.add(RowFactory.create("FATAL", "2015-4-21 19:23:20"));
 
             // creation of the schema
             StructField[] schemaFields = new StructField[]{
@@ -208,7 +215,7 @@ public class Main {
             inMemoryData.add(RowFactory.create("FATAL", "2016-12-31 03:22:34"));
             inMemoryData.add(RowFactory.create("WARN", "2016-12-31 03:21:21"));
             inMemoryData.add(RowFactory.create("INFO", "2015-4-21 14:32:21"));
-            inMemoryData.add(RowFactory.create("FATAL","2015-4-21 19:23:20"));
+            inMemoryData.add(RowFactory.create("FATAL", "2015-4-21 19:23:20"));
 
             // creation of the schema
             StructField[] schemaFields = new StructField[]{
@@ -224,6 +231,214 @@ public class Main {
             resultsCount.show();
             Dataset<Row> resultsCollectList = sparkSession.sql("select level, collect_list(datetime) from logging_table group by level order by level");
             resultsCollectList.show();
+        }
+    }
+
+    private static void lecture65DateFormatting() {
+
+        System.out.println("---- lecture65DateFormatting");
+
+        try (SparkSession sparkSession = SparkSession.builder().appName("testingSql").master("local[*]")
+                .config("spark.sql.warehouse.dir", "file:///d:/tmp/")
+                .getOrCreate()) {
+
+            List<Row> inMemoryData = new ArrayList<>();
+            inMemoryData.add(RowFactory.create("WARN", "2016-12-31 04:19:32"));
+            inMemoryData.add(RowFactory.create("FATAL", "2016-12-31 03:22:34"));
+            inMemoryData.add(RowFactory.create("WARN", "2016-12-31 03:21:21"));
+            inMemoryData.add(RowFactory.create("INFO", "2015-4-21 14:32:21"));
+            inMemoryData.add(RowFactory.create("FATAL", "2015-4-21 19:23:20"));
+
+            // creation of the schema
+            StructField[] schemaFields = new StructField[]{
+                    new StructField("level", DataTypes.StringType, false, Metadata.empty()),
+                    new StructField("datetime", DataTypes.StringType, false, Metadata.empty())
+            };
+            StructType schema = new StructType(schemaFields);
+
+            Dataset<Row> dataFrame = sparkSession.createDataFrame(inMemoryData, schema);
+            dataFrame.createOrReplaceTempView("logging_table");
+
+            // without giving an alias for the "date_format" column, it prints the implicit cast done: date_format(CAST(datetime AS TIMESTAMP)
+            Dataset<Row> results = sparkSession.sql("select level, date_format(datetime, 'yyyy') from logging_table order by level");
+            results.show();
+
+            results = sparkSession.sql("select level, date_format(datetime, 'MMMM') as month from logging_table order by level");
+            results.show();
+        }
+    }
+
+    private static void lecture66MultipleGrouping() {
+
+        System.out.println("---- lecture66MultipleGrouping");
+
+        try (SparkSession sparkSession = SparkSession.builder().appName("testingSql").master("local[*]")
+                .config("spark.sql.warehouse.dir", "file:///d:/tmp/")
+                .getOrCreate()) {
+
+            List<Row> inMemoryData = new ArrayList<>();
+            inMemoryData.add(RowFactory.create("WARN", "2016-12-31 04:19:32"));
+            inMemoryData.add(RowFactory.create("FATAL", "2016-12-31 03:22:34"));
+            inMemoryData.add(RowFactory.create("WARN", "2016-12-31 03:21:21"));
+            inMemoryData.add(RowFactory.create("INFO", "2015-4-21 14:32:21"));
+            inMemoryData.add(RowFactory.create("FATAL", "2015-4-21 19:23:20"));
+
+            // creation of the schema
+            StructField[] schemaFields = new StructField[]{
+                    new StructField("level", DataTypes.StringType, false, Metadata.empty()),
+                    new StructField("datetime", DataTypes.StringType, false, Metadata.empty())
+            };
+            StructType schema = new StructType(schemaFields);
+
+            Dataset<Row> dataFrame = sparkSession.createDataFrame(inMemoryData, schema);
+            dataFrame.createOrReplaceTempView("logging_table");
+
+            Dataset<Row> results = sparkSession.sql("select level, date_format(datetime, 'MMMM') as month from logging_table");
+            results.show();
+
+            results.createOrReplaceTempView("logging_table");
+            Dataset<Row> resultsMultipleGrouping = sparkSession.sql("select level, month, count(1) as total from logging_table group by level, month");
+            resultsMultipleGrouping.show();
+        }
+    }
+
+    private static void lecture66MultipleGroupingBigLog() {
+
+        System.out.println("---- lecture66MultipleGroupingBigLog");
+
+        try (SparkSession sparkSession = SparkSession.builder().appName("testingSql").master("local[*]")
+                .config("spark.sql.warehouse.dir", "file:///d:/tmp/")
+                .getOrCreate()) {
+
+            // creation of the schema
+            StructField[] schemaFields = new StructField[]{
+                    new StructField("level", DataTypes.StringType, false, Metadata.empty()),
+                    new StructField("datetime", DataTypes.StringType, false, Metadata.empty())
+            };
+            StructType schema = new StructType(schemaFields);
+
+            Dataset<Row> dataFrame = sparkSession.read().option("header", true).csv("src/main/resources/biglog.txt");
+            dataFrame.createOrReplaceTempView("logging_table");
+
+            Dataset<Row> results = sparkSession.sql("select level, date_format(datetime, 'MMMM') as month, count(1) as total from logging_table group by level, month");
+            results.show();
+
+            results.createOrReplaceTempView("total_results");
+            Dataset<Row> resultsTotal = sparkSession.sql("select sum(total) from total_results");
+            resultsTotal.show();
+        }
+    }
+
+    private static void lecture67Ordering() {
+
+        System.out.println("---- lecture67Ordering");
+
+        try (SparkSession sparkSession = SparkSession.builder().appName("testingSql").master("local[*]")
+                .config("spark.sql.warehouse.dir", "file:///d:/tmp/")
+                .getOrCreate()) {
+
+            // creation of the schema
+            StructField[] schemaFields = new StructField[]{
+                    new StructField("level", DataTypes.StringType, false, Metadata.empty()),
+                    new StructField("datetime", DataTypes.StringType, false, Metadata.empty())
+            };
+            StructType schema = new StructType(schemaFields);
+
+            Dataset<Row> dataFrame = sparkSession.read().option("header", true).csv("src/main/resources/biglog.txt");
+            dataFrame.createOrReplaceTempView("logging_table");
+
+            Dataset<Row> results = sparkSession.sql("select " +
+                    "level, date_format(datetime, 'MMMM') as month, first(date_format(datetime, 'M')) as monthnum, count(1) as total " +
+                    "from logging_table " +
+                    "group by level, month " +
+                    "order by monthnum");
+            results.show(30);
+
+            // cast monthnum to int to avoid an alphabetic sort
+            results = sparkSession.sql("select " +
+                    "level, date_format(datetime, 'MMMM') as month, cast(first(date_format(datetime, 'M')) as int) as monthnum, count(1) as total " +
+                    "from logging_table " +
+                    "group by level, month " +
+                    "order by monthnum");
+            results.show(30);
+
+            // if we just want to sort our date, we can avoid to declare our extra column, and, instead, compute it in the order clause
+            results = sparkSession.sql("select " +
+                    "level, date_format(datetime, 'MMMM') as month, count(1) as total " +
+                    "from logging_table " +
+                    "group by level, month " +
+                    "order by cast(first(date_format(datetime, 'M')) as int), level");
+            results.show(100);
+        }
+    }
+
+    private static void lecture68DataFrameAPI() {
+
+        System.out.println("---- lecture68DataFrameAPI");
+
+        try (SparkSession sparkSession = SparkSession.builder().appName("testingSql").master("local[*]")
+                .config("spark.sql.warehouse.dir", "file:///d:/tmp/")
+                .getOrCreate()) {
+
+            // creation of the schema
+            StructField[] schemaFields = new StructField[]{
+                    new StructField("level", DataTypes.StringType, false, Metadata.empty()),
+                    new StructField("datetime", DataTypes.StringType, false, Metadata.empty())
+            };
+            StructType schema = new StructType(schemaFields);
+
+            Dataset<Row> dataFrame = sparkSession.read().option("header", true).csv("src/main/resources/biglog.txt");
+
+/*            dataFrame.createOrReplaceTempView("logging_table");
+            Dataset<Row> results = sparkSession.sql("select " +
+                    "level, date_format(datetime, 'MMMM') as month, count(1) as total " +
+                    "from logging_table " +
+                    "group by level, month " +
+                    "order by cast(first(date_format(datetime, 'M')) as int), level");*/
+
+            // "half way" method of using the DataFrame API: using parts of Java and SQL API
+            Dataset<Row> resultsHalfWay = dataFrame.selectExpr("level", "date_format(datetime, 'MMMM') as month");
+            resultsHalfWay.show(30);
+
+            // full Java API way to create our statement
+            Dataset<Row> resultsJava = dataFrame.select(col("level"), date_format(col("datetime"), "MMMM").as("month"));
+            resultsJava.show(30);
+        }
+    }
+
+    private static void lecture69DataFrameGrouping() {
+
+        System.out.println("---- lecture69DataFrameGrouping");
+
+        try (SparkSession sparkSession = SparkSession.builder().appName("testingSql").master("local[*]")
+                .config("spark.sql.warehouse.dir", "file:///d:/tmp/")
+                .getOrCreate()) {
+
+            // creation of the schema
+            StructField[] schemaFields = new StructField[]{
+                    new StructField("level", DataTypes.StringType, false, Metadata.empty()),
+                    new StructField("datetime", DataTypes.StringType, false, Metadata.empty())
+            };
+            StructType schema = new StructType(schemaFields);
+
+            Dataset<Row> dataFrame = sparkSession.read().option("header", true).csv("src/main/resources/biglog.txt");
+
+            // groupBy statement with DataFrame API
+            Dataset<Row> results = dataFrame.select(
+                    col("level"),
+                    date_format(col("datetime"), "MMMM").as("month"),
+                    date_format(col("datetime"), "M").cast(DataTypes.IntegerType).as("monthnum")
+            );
+
+            // Any column in the select BUT NOT IN THE groupBy will be dropped by the process
+            // We MUST add "monthnum" here in the groupBy to be able to use it in the next coming orderBy
+            RelationalGroupedDataset resultsGroup = results.groupBy(col("level"), col("month"), col("monthnum"));
+            Dataset<Row> resultsGroupCount = resultsGroup.count();
+            Dataset<Row> resultsGroupCountOrder = resultsGroupCount.orderBy(col("monthnum"), col("level"));
+            // Now that the ordering is done, we can drop the "only for process" monthnum column
+            Dataset<Row> resultsGroupCountOrderFinal = resultsGroupCountOrder.drop(col("monthnum"));
+            resultsGroupCountOrderFinal.show(30);
+
         }
     }
 

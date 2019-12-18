@@ -303,8 +303,30 @@ Whenever possible, avoid `groupByKey` which suffers from the following issues:
 * it implies a very big shuffle, and so a great I/O cost.
 * as we manipulate very big data sets, *`groupByKey` could result in storing To of data in memory*, which would result in an OOM (Out Of Memory) exception.
 
+=== 22.66 - Multiple grouping
 
+WARNING: You can only perform aggregation on column that you do NOT group.
 
+In this example:
+
+----
+select level, month from logging_table group by level, month
+----
+
+You can't apply any aggregation function on either `level` or `month`. +
+The "trick" to do so, is to add a new column on which to apply your function:
+
+----
+select level, month, count(1) from logging_table group by level, month
+----
+
+=== 23.67 - Ordering
+
+WARNING: Any column that is not part of a "grouping", *MUST* have an aggregation function performed on it.
+
+=== 24.69 - DataFrame grouping
+
+TIP: For a good explanation of what is a SQL *roll-up*, check http://www.sqltutorial.org/sql-rollup/
 
 
 
